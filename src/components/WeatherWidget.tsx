@@ -1,7 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Cloud, Search, Droplets, Wind, Thermometer } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { 
+  Cloud, 
+  Search, 
+  Droplets, 
+  Wind, 
+  Thermometer, 
+  Sun, 
+  CloudRain, 
+  CloudSnow, 
+  CloudLightning, 
+  CloudDrizzle,
+  CloudFog,
+  CloudSun,
+  Moon,
+  CloudMoon
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface WeatherData {
@@ -13,6 +28,20 @@ interface WeatherData {
   windSpeed?: number
   feelsLike?: number
   timezone: number
+}
+
+interface ForecastDay {
+  date: string
+  temp: {
+    min: number
+    max: number
+  }
+  condition: string
+  icon: string
+}
+
+interface WeatherForecast {
+  daily: ForecastDay[]
 }
 
 interface Coordinates {
@@ -30,8 +59,39 @@ const getWeatherBackground = (condition: string, isDark: boolean) => {
     : 'from-gray-700 to-gray-600'
 }
 
+const getWeatherIcon = (condition: string, icon: string) => {
+  // Check if it's night time based on icon code (ends with 'n')
+  const isNight = icon.endsWith('n');
+  
+  // Map weather conditions to Lucide icons
+  switch (condition.toLowerCase()) {
+    case 'clear':
+      return isNight ? Moon : Sun;
+    case 'clouds':
+      if (icon === '02d' || icon === '02n') {
+        return isNight ? CloudMoon : CloudSun;
+      }
+      return Cloud;
+    case 'rain':
+      return CloudRain;
+    case 'drizzle':
+      return CloudDrizzle;
+    case 'thunderstorm':
+      return CloudLightning;
+    case 'snow':
+      return CloudSnow;
+    case 'mist':
+    case 'fog':
+    case 'haze':
+      return CloudFog;
+    default:
+      return Cloud;
+  }
+}
+
 export default function WeatherWidget() {
   const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [forecast, setForecast] = useState<WeatherForecast | null>(null)
   const [loading, setLoading] = useState(true)
   const [apiError, setApiError] = useState<string | null>(null)
   const [cityInput, setCityInput] = useState('')
@@ -125,7 +185,7 @@ export default function WeatherWidget() {
   }
 
   useEffect(() => {
-    const fetchWeather = async () => {
+    const fetchWeatherAndForecast = async () => {
       if (!coordinates) return
 
       try {
@@ -136,28 +196,86 @@ export default function WeatherWidget() {
           return
         }
 
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${coordinates.lat}&lon=${coordinates.lon}&units=metric&appid=${apiKey}`
+        // Fetch current weather
+        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${coordinates.lat}&lon=${coordinates.lon}&units=metric&appid=${apiKey}`
+        const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${coordinates.lat}&lon=${coordinates.lon}&units=metric&appid=${apiKey}`
         
-        const response = await fetch(url)
-        const data = await response.json()
+        const [weatherResponse, forecastResponse] = await Promise.all([
+          fetch(weatherUrl),
+          fetch(forecastUrl)
+        ])
 
-        if (!response.ok) {
-          setApiError(data.message || 'Failed to fetch weather data')
+        const [weatherData, forecastData] = await Promise.all([
+          weatherResponse.json(),
+          forecastResponse.json()
+        ])
+
+        if (!weatherResponse.ok || !forecastResponse.ok) {
+          setApiError(weatherData.message || forecastData.message || 'Failed to fetch weather data')
           setLoading(false)
           return
         }
 
-        if (data.main && data.weather?.[0]) {
+        if (weatherData.main && weatherData.weather?.[0]) {
           setWeather({
-            temp: Math.round(data.main.temp),
-            condition: data.weather[0].main,
-            humidity: data.main.humidity,
-            icon: data.weather[0].icon,
+            temp: Math.round(weatherData.main.temp),
+            condition: weatherData.weather[0].main,
+            humidity: weatherData.main.humidity,
+            icon: weatherData.weather[0].icon,
             city: coordinates.name,
-            windSpeed: Math.round(data.wind?.speed || 0),
-            feelsLike: Math.round(data.main.feels_like),
-            timezone: data.timezone
+            windSpeed: Math.round(weatherData.wind?.speed || 0),
+            feelsLike: Math.round(weatherData.main.feels_like),
+            timezone: weatherData.timezone
           })
+
+          // Process forecast data - get daily min/max from all data points
+          if (forecastData.list) {
+            const dailyForecasts = forecastData.list.reduce((acc: { [key: string]: any }, curr: any) => {
+              const date = new Date(curr.dt * 1000)
+              const dayKey = date.toLocaleDateString()
+              
+              if (!acc[dayKey]) {
+                acc[dayKey] = {
+                  date: date,
+                  temp: {
+                    min: curr.main.temp,
+                    max: curr.main.temp
+                  },
+                  condition: curr.weather[0].main,
+                  icon: curr.weather[0].icon,
+                  readings: 1
+                }
+              } else {
+                // Update min/max temperatures
+                acc[dayKey].temp.min = Math.min(acc[dayKey].temp.min, curr.main.temp)
+                acc[dayKey].temp.max = Math.max(acc[dayKey].temp.max, curr.main.temp)
+                // Use the most frequent condition for the day
+                if (curr.weather[0].main !== acc[dayKey].condition) {
+                  acc[dayKey].readings++
+                  if (acc[dayKey].readings > 4) {
+                    acc[dayKey].condition = curr.weather[0].main
+                    acc[dayKey].icon = curr.weather[0].icon
+                  }
+                }
+              }
+              return acc
+            }, {})
+
+            const processedForecasts = Object.values(dailyForecasts)
+              .slice(0, 7)
+              .map((day: any) => ({
+                date: day.date.toLocaleDateString('en-US', { weekday: 'short' }),
+                temp: {
+                  min: Math.round(day.temp.min),
+                  max: Math.round(day.temp.max)
+                },
+                condition: day.condition,
+                icon: day.icon
+              }))
+
+            setForecast({ daily: processedForecasts })
+          }
+          
           setApiError(null)
         } else {
           setApiError('Invalid data format received')
@@ -171,8 +289,8 @@ export default function WeatherWidget() {
     }
 
     if (coordinates) {
-      fetchWeather()
-      const interval = setInterval(fetchWeather, 300000) // Update every 5 minutes
+      fetchWeatherAndForecast()
+      const interval = setInterval(fetchWeatherAndForecast, 300000) // Update every 5 minutes
       return () => clearInterval(interval)
     }
   }, [coordinates])
@@ -261,13 +379,15 @@ export default function WeatherWidget() {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-center mb-8">
-                  <img 
-                    src={`https://openweathermap.org/img/wn/${weather.icon}@4x.png`}
-                    alt={weather.condition}
-                    className="w-32 h-32 filter drop-shadow-lg"
-                  />
-                  <div className="text-white">
+                <div className="flex flex-col md:flex-row items-center justify-center mb-8 gap-4">
+                  {/* Current weather icon */}
+                  <div className="relative w-32 h-32">
+                    {weather && (() => {
+                      const IconComponent = getWeatherIcon(weather.condition, weather.icon);
+                      return <IconComponent className="w-full h-full text-white drop-shadow-lg" strokeWidth={1} />;
+                    })()}
+                  </div>
+                  <div className="text-white text-center md:text-left">
                     <motion.div 
                       key={weather.temp}
                       initial={{ opacity: 0, scale: 0.5 }}
@@ -280,7 +400,7 @@ export default function WeatherWidget() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                   <motion.div 
                     whileHover={{ scale: 1.05 }}
                     className="bg-white/10 backdrop-blur-md rounded-lg p-3 text-center"
@@ -308,6 +428,34 @@ export default function WeatherWidget() {
                     <p className="text-white font-bold">{weather.feelsLike}°C</p>
                   </motion.div>
                 </div>
+
+                {forecast && (
+                  <div className="mt-8 w-full">
+                    <h3 className="text-white font-bold mb-4">7-Day Forecast</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-4 w-full">
+                      {forecast.daily.map((day, index) => {
+                        const IconComponent = getWeatherIcon(day.condition, day.icon);
+                        return (
+                          <motion.div 
+                            key={index}
+                            whileHover={{ scale: 1.05 }}
+                            className="bg-white/10 backdrop-blur-md rounded-lg p-3 text-center flex flex-col items-center justify-between h-full"
+                          >
+                            <p className="text-white/70 text-sm font-medium mb-2">{day.date}</p>
+                            <div className="relative w-12 h-12">
+                              <IconComponent className="w-full h-full text-white drop-shadow-lg" strokeWidth={1} />
+                            </div>
+                            <p className="text-white/70 text-sm mt-1">{day.condition}</p>
+                            <div className="mt-2">
+                              <p className="text-white font-bold">{day.temp.max}°C</p>
+                              <p className="text-white/70 text-sm">{day.temp.min}°C</p>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             ) : null}
           </motion.div>
