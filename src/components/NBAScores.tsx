@@ -67,7 +67,6 @@ export default function NBAScores() {
 
   useEffect(() => {
     const fetchGames = async () => {
-      setLoading(true)
       try {
         // Get dates for 5 days before and after today
         const dates = Array.from({ length: 11 }, (_, i) => {
@@ -131,14 +130,14 @@ export default function NBAScores() {
         console.error('Error fetching games:', error)
         setGames([])
       }
-      setLoading(false)
+      if (loading) setLoading(false)
     }
 
     fetchGames()
     // Refresh every 30 seconds
     const interval = setInterval(fetchGames, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [loading])
 
   // Filter games based on active tab
   const filteredGames = games.filter(game => game.type === activeTab)
@@ -191,156 +190,137 @@ export default function NBAScores() {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <motion.div
-            key="loader"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center justify-center h-40"
-          >
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 animate-ping"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 animate-spin"></div>
+      {loading ? (
+        <div className="flex items-center justify-center h-40">
+          <div className="relative w-20 h-20">
+            <div className="absolute inset-0 rounded-full border-4 border-blue-500/20 animate-ping"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 animate-spin"></div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredGames.length === 0 ? (
+            <div className="text-center text-gray-400 py-12 text-xl font-bold">
+              No {activeTab} games available
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="content"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-6"
-          >
-            {filteredGames.length === 0 ? (
-              <div className="text-center text-gray-400 py-12 text-xl font-bold">
-                No {activeTab} games available
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {filteredGames.map((game, index) => (
-                  <motion.div
-                    key={game.id}
-                    initial={{ opacity: 0, x: -50, rotateX: -20 }}
-                    animate={{ opacity: 1, x: 0, rotateX: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ scale: 1.02, rotateX: 5 }}
-                    className="relative"
-                  >
-                    
-                    {/* Main content */}
-                    <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-gray-900/90 to-black/90 p-6 backdrop-blur-xl border border-white/10">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1 space-y-4">
-                          {/* Date with neon effect */}
-                          <div className="text-sm font-medium text-cyan-400 mb-4 tracking-wide">
-                            {format(parseISO(game.date), 'MMM dd, yyyy h:mm a')}
-                          </div>
-                          
-                          {/* Teams section */}
-                          <div className="space-y-4">
-                            {/* Home team */}
-                            <div className="flex items-center justify-between group">
-                              <div className="flex items-center space-x-3">
-                                <div className="relative">
-                                  {game.home_team.logo && (
-                                    <img 
-                                      src={game.home_team.logo} 
-                                      alt={game.home_team.name}
-                                      className="w-10 h-10 object-contain transform group-hover:scale-110 transition-transform duration-300"
-                                    />
-                                  )}
-                                </div>
-                                <Link 
-                                  href={`/teams/${game.home_team.abbreviation}`}
-                                  className="font-bold text-xl text-white group-hover:text-cyan-400 transition-colors duration-300"
-                                >
-                                  {game.home_team.name}
-                                </Link>
-                              </div>
-                              {game.type === 'upcoming' && game.spread ? (
-                                <span className="text-cyan-400 font-medium text-lg">
-                                  {game.spread}
-                                </span>
-                              ) : (
-                                <span className={`text-2xl font-bold ${getScoreColor(game.home_team.score, game.visitor_team.score)}`}>
-                                  {game.home_team.score}
-                                </span>
-                              )}
-                            </div>
-                            
-                            {/* Visitor team */}
-                            <div className="flex items-center justify-between group">
-                              <div className="flex items-center space-x-3">
-                                <div className="relative">
-                                  {game.visitor_team.logo && (
-                                    <img 
-                                      src={game.visitor_team.logo} 
-                                      alt={game.visitor_team.name}
-                                      className="w-10 h-10 object-contain transform group-hover:scale-110 transition-transform duration-300"
-                                    />
-                                  )}
-                                </div>
-                                <Link 
-                                  href={`/teams/${game.visitor_team.abbreviation}`}
-                                  className="font-bold text-xl text-white group-hover:text-purple-400 transition-colors duration-300"
-                                >
-                                  {game.visitor_team.name}
-                                </Link>
-                              </div>
-                              {game.type === 'upcoming' ? (
-                                <span className="text-sm text-purple-400">
-                                  {game.status}
-                                </span>
-                              ) : (
-                                <span className={`text-2xl font-bold ${getScoreColor(game.visitor_team.score, game.home_team.score)}`}>
-                                  {game.visitor_team.score}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {filteredGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="relative"
+                >
+                  {/* Main content */}
+                  <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-gray-900/90 to-black/90 p-6 backdrop-blur-xl border border-white/10">
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1 space-y-4">
+                        {/* Date with neon effect */}
+                        <div className="text-sm font-medium text-cyan-400 mb-4 tracking-wide">
+                          {format(parseISO(game.date), 'MMM dd, yyyy h:mm a')}
                         </div>
                         
-                        {/* Status indicator */}
-                        <div className="ml-6">
-                          <div className="flex flex-col items-center justify-center px-6 py-4 rounded-xl bg-gray-900/50 backdrop-blur-xl">
-                            {game.type === 'past' && (
-                              <>
-                                <Trophy className="h-8 w-8 text-yellow-400 mb-2" />
-                                <span className="text-sm font-medium text-yellow-400">Final</span>
-                              </>
+                        {/* Teams section */}
+                        <div className="space-y-4">
+                          {/* Home team */}
+                          <div className="flex items-center justify-between group">
+                            <div className="flex items-center space-x-3">
+                              <div className="relative">
+                                {game.home_team.logo && (
+                                  <img 
+                                    src={game.home_team.logo} 
+                                    alt={game.home_team.name}
+                                    className="w-10 h-10 object-contain transform group-hover:scale-110 transition-transform duration-300"
+                                  />
+                                )}
+                              </div>
+                              <Link 
+                                href={`/teams/${game.home_team.abbreviation}`}
+                                className="font-bold text-xl text-white group-hover:text-cyan-400 transition-colors duration-300"
+                              >
+                                {game.home_team.name}
+                              </Link>
+                            </div>
+                            {game.type === 'upcoming' && game.spread ? (
+                              <span className="text-cyan-400 font-medium text-lg">
+                                {game.spread}
+                              </span>
+                            ) : (
+                              <span className={`text-2xl font-bold ${getScoreColor(game.home_team.score, game.visitor_team.score)}`}>
+                                {game.home_team.score}
+                              </span>
                             )}
-                            {game.type === 'live' && (
-                              <>
-                                <Flame className="h-8 w-8 text-red-500 mb-2 animate-pulse" />
-                                <span className="text-sm font-medium text-red-400">
-                                  Q{game.period} {game.time}
-                                </span>
-                              </>
-                            )}
-                            {game.type === 'upcoming' && (
-                              <>
-                                <Calendar className="h-8 w-8 text-green-400 mb-2" />
-                                <span className="text-sm font-medium text-green-400">
-                                  {format(parseISO(game.date), 'h:mm a')}
-                                </span>
-                                <span className="text-xs font-medium text-gray-400 mt-1">
-                                  Local Time
-                                </span>
-                              </>
+                          </div>
+                          
+                          {/* Visitor team */}
+                          <div className="flex items-center justify-between group">
+                            <div className="flex items-center space-x-3">
+                              <div className="relative">
+                                {game.visitor_team.logo && (
+                                  <img 
+                                    src={game.visitor_team.logo} 
+                                    alt={game.visitor_team.name}
+                                    className="w-10 h-10 object-contain transform group-hover:scale-110 transition-transform duration-300"
+                                  />
+                                )}
+                              </div>
+                              <Link 
+                                href={`/teams/${game.visitor_team.abbreviation}`}
+                                className="font-bold text-xl text-white group-hover:text-purple-400 transition-colors duration-300"
+                              >
+                                {game.visitor_team.name}
+                              </Link>
+                            </div>
+                            {game.type === 'upcoming' ? (
+                              <span className="text-sm text-purple-400">
+                                {game.status}
+                              </span>
+                            ) : (
+                              <span className={`text-2xl font-bold ${getScoreColor(game.visitor_team.score, game.home_team.score)}`}>
+                                {game.visitor_team.score}
+                              </span>
                             )}
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Status indicator */}
+                      <div className="ml-6">
+                        <div className="flex flex-col items-center justify-center px-6 py-4 rounded-xl bg-gray-900/50 backdrop-blur-xl">
+                          {game.type === 'past' && (
+                            <>
+                              <Trophy className="h-8 w-8 text-yellow-400 mb-2" />
+                              <span className="text-sm font-medium text-yellow-400">Final</span>
+                            </>
+                          )}
+                          {game.type === 'live' && (
+                            <>
+                              <Flame className="h-8 w-8 text-red-500 mb-2 animate-pulse" />
+                              <span className="text-sm font-medium text-red-400">
+                                Q{game.period} {game.time}
+                              </span>
+                            </>
+                          )}
+                          {game.type === 'upcoming' && (
+                            <>
+                              <Calendar className="h-8 w-8 text-green-400 mb-2" />
+                              <span className="text-sm font-medium text-green-400">
+                                {format(parseISO(game.date), 'h:mm a')}
+                              </span>
+                              <span className="text-xs font-medium text-gray-400 mt-1">
+                                Local Time
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }

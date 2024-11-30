@@ -1,5 +1,6 @@
 export interface NBATeam {
   id: string;
+  espnId: number;
   name: string;
   city: string;
   abbreviation: string;
@@ -13,6 +14,7 @@ export interface NBATeam {
 export const NBA_TEAMS: Record<string, NBATeam> = {
   'ATL': {
     id: 'ATL',
+    espnId: 1,
     name: 'Hawks',
     city: 'Atlanta',
     abbreviation: 'ATL',
@@ -24,6 +26,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'BKN': {
     id: 'BKN',
+    espnId: 17,
     name: 'Nets',
     city: 'Brooklyn',
     abbreviation: 'BKN',
@@ -35,6 +38,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'BOS': {
     id: 'BOS',
+    espnId: 2,
     name: 'Celtics',
     city: 'Boston',
     abbreviation: 'BOS',
@@ -46,6 +50,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'CHA': {
     id: 'CHA',
+    espnId: 30,
     name: 'Hornets',
     city: 'Charlotte',
     abbreviation: 'CHA',
@@ -57,6 +62,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'CHI': {
     id: 'CHI',
+    espnId: 4,
     name: 'Bulls',
     city: 'Chicago',
     abbreviation: 'CHI',
@@ -68,6 +74,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'CLE': {
     id: 'CLE',
+    espnId: 5,
     name: 'Cavaliers',
     city: 'Cleveland',
     abbreviation: 'CLE',
@@ -79,6 +86,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'DAL': {
     id: 'DAL',
+    espnId: 6,
     name: 'Mavericks',
     city: 'Dallas',
     abbreviation: 'DAL',
@@ -90,6 +98,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'DEN': {
     id: 'DEN',
+    espnId: 7,
     name: 'Nuggets',
     city: 'Denver',
     abbreviation: 'DEN',
@@ -101,6 +110,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'DET': {
     id: 'DET',
+    espnId: 8,
     name: 'Pistons',
     city: 'Detroit',
     abbreviation: 'DET',
@@ -112,6 +122,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'GSW': {
     id: 'GSW',
+    espnId: 9,
     name: 'Warriors',
     city: 'Golden State',
     abbreviation: 'GSW',
@@ -123,6 +134,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'HOU': {
     id: 'HOU',
+    espnId: 10,
     name: 'Rockets',
     city: 'Houston',
     abbreviation: 'HOU',
@@ -134,6 +146,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'IND': {
     id: 'IND',
+    espnId: 11,
     name: 'Pacers',
     city: 'Indiana',
     abbreviation: 'IND',
@@ -145,6 +158,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'LAC': {
     id: 'LAC',
+    espnId: 12,
     name: 'Clippers',
     city: 'Los Angeles',
     abbreviation: 'LAC',
@@ -156,6 +170,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'LAL': {
     id: 'LAL',
+    espnId: 13,
     name: 'Lakers',
     city: 'Los Angeles',
     abbreviation: 'LAL',
@@ -167,6 +182,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'MEM': {
     id: 'MEM',
+    espnId: 29,
     name: 'Grizzlies',
     city: 'Memphis',
     abbreviation: 'MEM',
@@ -178,6 +194,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'MIA': {
     id: 'MIA',
+    espnId: 14,
     name: 'Heat',
     city: 'Miami',
     abbreviation: 'MIA',
@@ -189,6 +206,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'MIL': {
     id: 'MIL',
+    espnId: 15,
     name: 'Bucks',
     city: 'Milwaukee',
     abbreviation: 'MIL',
@@ -200,6 +218,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'MIN': {
     id: 'MIN',
+    espnId: 16,
     name: 'Timberwolves',
     city: 'Minnesota',
     abbreviation: 'MIN',
@@ -211,6 +230,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'NOP': {
     id: 'NOP',
+    espnId: 3,
     name: 'Pelicans',
     city: 'New Orleans',
     abbreviation: 'NOP',
@@ -222,6 +242,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'NYK': {
     id: 'NYK',
+    espnId: 18,
     name: 'Knicks',
     city: 'New York',
     abbreviation: 'NYK',
@@ -233,6 +254,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'OKC': {
     id: 'OKC',
+    espnId: 25,
     name: 'Thunder',
     city: 'Oklahoma City',
     abbreviation: 'OKC',
@@ -244,6 +266,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'ORL': {
     id: 'ORL',
+    espnId: 19,
     name: 'Magic',
     city: 'Orlando',
     abbreviation: 'ORL',
@@ -255,6 +278,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'PHI': {
     id: 'PHI',
+    espnId: 20,
     name: '76ers',
     city: 'Philadelphia',
     abbreviation: 'PHI',
@@ -266,6 +290,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'PHX': {
     id: 'PHX',
+    espnId: 21,
     name: 'Suns',
     city: 'Phoenix',
     abbreviation: 'PHX',
@@ -277,6 +302,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'POR': {
     id: 'POR',
+    espnId: 22,
     name: 'Trail Blazers',
     city: 'Portland',
     abbreviation: 'POR',
@@ -288,6 +314,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'SAC': {
     id: 'SAC',
+    espnId: 23,
     name: 'Kings',
     city: 'Sacramento',
     abbreviation: 'SAC',
@@ -299,6 +326,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'SAS': {
     id: 'SAS',
+    espnId: 24,
     name: 'Spurs',
     city: 'San Antonio',
     abbreviation: 'SAS',
@@ -310,6 +338,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'TOR': {
     id: 'TOR',
+    espnId: 28,
     name: 'Raptors',
     city: 'Toronto',
     abbreviation: 'TOR',
@@ -321,6 +350,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'UTA': {
     id: 'UTA',
+    espnId: 26,
     name: 'Jazz',
     city: 'Utah',
     abbreviation: 'UTA',
@@ -332,6 +362,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
   },
   'WAS': {
     id: 'WAS',
+    espnId: 27,
     name: 'Wizards',
     city: 'Washington',
     abbreviation: 'WAS',
