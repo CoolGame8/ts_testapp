@@ -39,10 +39,6 @@ interface Game {
   type: 'live' | 'past' | 'upcoming'
 }
 
-interface GameData {
-  [key: number]: any
-}
-
 interface PlayerStats {
   name: string
   points: number
@@ -59,6 +55,64 @@ interface TopPerformers {
   players: PlayerStats[]
 }
 
+interface ESPNGame {
+  id: string
+  date: string
+  status: {
+    type: {
+      completed: boolean
+    }
+  }
+  competitions: Array<{
+    competitors: Array<{
+      homeAway: 'home' | 'away'
+      team: {
+        id: string
+        name: string
+        abbreviation: string
+        logo: string
+      }
+      score: string
+    }>
+  }>
+}
+
+interface ESPNTeamData {
+  abbreviation: string
+  name: string
+  logos: Array<{
+    href: string
+  }>
+  leaders: Array<{
+    athlete: {
+      fullName: string
+    }
+    statistics: {
+      points?: number
+      rebounds?: number
+      assists?: number
+      steals?: number
+      blocks?: number
+      minutes?: string
+    }
+  }>
+}
+
+interface ProcessedGame {
+  id: string
+  date: string
+  teamScore: number
+  opponentScore: number
+  won: boolean
+  isHome: boolean
+  opponent: {
+    id: string
+    name: string
+    abbreviation: string
+    logo: string
+  }
+}
+
 export default function TeamPage() {
   const params = useParams()
   const router = useRouter()
@@ -68,6 +122,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
 
   const team = NBA_TEAMS[params.teamId as string]
+  const teamAbbreviation = team?.abbreviation
 
   useEffect(() => {
     if (!team) {
@@ -76,6 +131,7 @@ export default function TeamPage() {
       return
     }
 
+    let isSubscribed = true;
     const fetchTeamData = async () => {
       try {
         if (!team) {
@@ -90,7 +146,9 @@ export default function TeamPage() {
           throw new Error('Invalid team ID')
         }
 
-        const response = await fetch(`/api/teams/${teamId}`)
+        const response = await fetch(`/api/teams/${teamId}`, {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        })
         console.log('Response status:', response.status)
 
         if (!response.ok) {
@@ -98,144 +156,163 @@ export default function TeamPage() {
         }
 
         const data = await response.json()
-        console.log('Raw API response:', JSON.stringify(data, null, 2))
-
+        
+        if (!isSubscribed) return;
+        
         if (data.error) {
           throw new Error(data.error)
         }
 
-        // Extract team data
-        const teamData = data.team
-        const schedule = data.schedule || []
-        const stats = data.stats || {}
-        
-        // Process games data
-        const games = schedule
-          .filter((event: any) => event.status?.type?.completed)
-          .map((event: any) => {
-            const competition = event.competitions[0]
-            const homeTeam = competition.competitors.find((c: any) => c.homeAway === 'home')
-            const awayTeam = competition.competitors.find((c: any) => c.homeAway === 'away')
-            const isHome = homeTeam.team.id === teamId
-            const teamScore = parseInt(isHome ? homeTeam.score : awayTeam.score)
-            const opponentScore = parseInt(isHome ? awayTeam.score : homeTeam.score)
-            const won = teamScore > opponentScore
-
-            return {
-              id: event.id,
-              date: event.date,
-              teamScore,
-              opponentScore,
-              won,
-              isHome,
-              opponent: {
-                id: isHome ? awayTeam.team.id : homeTeam.team.id,
-                name: isHome ? awayTeam.team.name : homeTeam.team.name,
-                abbreviation: isHome ? awayTeam.team.abbreviation : homeTeam.team.abbreviation,
-                logo: isHome ? awayTeam.team.logo : homeTeam.team.logo
+        // Process data only if component is still mounted
+        if (isSubscribed) {
+          // Extract team data
+          const teamData = data.team as ESPNTeamData
+          const schedule = data.schedule || []
+          const stats = data.stats || {}
+          
+          // Process games data
+          const games = schedule
+            .filter((event: ESPNGame) => event.status?.type?.completed)
+            .map((event: ESPNGame): ProcessedGame => {
+              const competition = event.competitions[0]
+              const homeTeam = competition.competitors.find(c => c.homeAway === 'home')
+              const awayTeam = competition.competitors.find(c => c.homeAway === 'away')
+              
+              if (!homeTeam || !awayTeam) {
+                throw new Error('Missing team data in competition')
               }
-            }
-          })
-          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              
+              const isHome = homeTeam.team.id === teamId
+              const teamScore = parseInt(isHome ? homeTeam.score : awayTeam.score)
+              const opponentScore = parseInt(isHome ? awayTeam.score : homeTeam.score)
+              const won = teamScore > opponentScore
 
-        // Calculate stats
-        const statsData = stats[0] || {}
-        
-        // Basic stats with safe defaults
-        const wins = Math.max(0, parseInt(String(statsData.wins)) || 0)
-        const losses = Math.max(0, parseInt(String(statsData.losses)) || 0)
-        const totalGames = wins + losses
-        
-        // Recent games stats
-        const last10Games = games.slice(0, 10)
-        const last10Wins = last10Games.filter(g => g.won).length
+              return {
+                id: event.id,
+                date: event.date,
+                teamScore,
+                opponentScore,
+                won,
+                isHome,
+                opponent: {
+                  id: isHome ? awayTeam.team.id : homeTeam.team.id,
+                  name: isHome ? awayTeam.team.name : homeTeam.team.name,
+                  abbreviation: isHome ? awayTeam.team.abbreviation : homeTeam.team.abbreviation,
+                  logo: isHome ? awayTeam.team.logo : homeTeam.team.logo
+                }
+              }
+            })
+            .sort((a: ProcessedGame, b: ProcessedGame) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-        // Points stats with safe defaults
-        let ppg = 0
-        let papg = 0
-        
-        try {
-          ppg = Math.round((Number(statsData.ppg) || 0) * 10) / 10
-          papg = Math.round((Number(statsData.papg) || 0) * 10) / 10
-        } catch (e) {
-          console.error('Error processing points stats:', e)
+          // Calculate stats
+          const statsData = stats[0] || {}
+          
+          // Basic stats with safe defaults
+          const wins = Math.max(0, parseInt(String(statsData.wins)) || 0)
+          const losses = Math.max(0, parseInt(String(statsData.losses)) || 0)
+          const totalGames = wins + losses
+          
+          // Recent games stats
+          const last10Games = games.slice(0, 10)
+          const last10Wins = last10Games.filter((g: ProcessedGame) => g.won).length
+
+          // Points stats with safe defaults
+          let ppg = 0
+          let papg = 0
+          
+          try {
+            ppg = Math.round((Number(statsData.ppg) || 0) * 10) / 10
+            papg = Math.round((Number(statsData.papg) || 0) * 10) / 10
+          } catch (e) {
+            console.error('Error processing points stats:', e)
+          }
+
+          const teamStats = {
+            wins,
+            losses,
+            winPct: totalGames > 0 ? wins / totalGames : 0,
+            lastTenRecord: `${last10Wins}-${10 - last10Wins}`,
+            streak: calculateStreak(games),
+            pointsPerGame: ppg,
+            pointsAllowed: papg
+          }
+
+          setTeamStats(teamStats)
+
+          // Format recent games for display
+          const recentGames = games.slice(0, 10).map((game: ProcessedGame): Game => ({
+            id: game.id,
+            date: game.date,
+            home_team: {
+              abbreviation: game.isHome ? teamData.abbreviation : game.opponent.abbreviation,
+              name: game.isHome ? teamData.name : game.opponent.name,
+              logo: game.isHome ? teamData.logos[0]?.href : game.opponent.logo,
+              score: game.isHome ? game.teamScore : game.opponentScore
+            },
+            visitor_team: {
+              abbreviation: game.isHome ? game.opponent.abbreviation : teamData.abbreviation,
+              name: game.isHome ? game.opponent.name : teamData.name,
+              logo: game.isHome ? game.opponent.logo : teamData.logos[0]?.href,
+              score: game.isHome ? game.opponentScore : game.teamScore
+            },
+            status: 'Final',
+            period: 4,
+            time: '0:00',
+            type: 'past' as const
+          }))
+
+          setRecentGames(recentGames)
+
+          // Process top performers
+          const leaders = teamData.leaders || []
+          const topPerformers = [{
+            gameId: 'season',
+            date: new Date().toISOString(),
+            players: leaders.map(leader => ({
+              name: leader.athlete.fullName,
+              points: leader.statistics?.points || 0,
+              rebounds: leader.statistics?.rebounds || 0,
+              assists: leader.statistics?.assists || 0,
+              steals: leader.statistics?.steals || 0,
+              blocks: leader.statistics?.blocks || 0,
+              minutes: leader.statistics?.minutes 
+                ? (() => {
+                    const [mins, secs] = leader.statistics.minutes.split(':').map(Number);
+                    return isNaN(mins) ? 0 : mins + (secs ? secs / 60 : 0);
+                  })()
+                : 0
+            })).slice(0, 3)
+          }]
+
+          setTopPerformers(topPerformers)
         }
-
-        const teamStats = {
-          wins,
-          losses,
-          winPct: totalGames > 0 ? wins / totalGames : 0,
-          lastTenRecord: `${last10Wins}-${10 - last10Wins}`,
-          streak: calculateStreak(games),
-          pointsPerGame: ppg,
-          pointsAllowed: papg
-        }
-
-        console.log('Calculated stats:', teamStats)
-        setTeamStats(teamStats)
-
-        // Format recent games for display
-        const recentGames = games.slice(0, 10).map(game => ({
-          id: game.id,
-          date: game.date,
-          home_team: {
-            abbreviation: game.isHome ? teamData.abbreviation : game.opponent.abbreviation,
-            name: game.isHome ? teamData.name : game.opponent.name,
-            logo: game.isHome ? teamData.logos[0].href : game.opponent.logo,
-            score: game.isHome ? game.teamScore : game.opponentScore
-          },
-          visitor_team: {
-            abbreviation: game.isHome ? game.opponent.abbreviation : teamData.abbreviation,
-            name: game.isHome ? game.opponent.name : teamData.name,
-            logo: game.isHome ? game.opponent.logo : teamData.logos[0].href,
-            score: game.isHome ? game.opponentScore : game.teamScore
-          },
-          status: 'Final',
-          period: 4,
-          time: '0:00',
-          type: 'past' as 'past'
-        }))
-
-        console.log('Formatted recent games:', recentGames)
-        setRecentGames(recentGames)
-
-        // For ESPN API, we'll show team leaders instead of per-game top performers
-        const leaders = teamData.leaders || []
-        const topPerformers = [{
-          gameId: 'season',
-          date: new Date().toISOString(),
-          players: leaders.map((leader: any) => ({
-            name: leader.athlete.fullName,
-            points: leader.statistics?.points || 0,
-            rebounds: leader.statistics?.rebounds || 0,
-            assists: leader.statistics?.assists || 0,
-            steals: leader.statistics?.steals || 0,
-            blocks: leader.statistics?.blocks || 0,
-            minutes: leader.statistics?.minutes || '0'
-          })).slice(0, 3)
-        }]
-
-        console.log('Processed top performers:', topPerformers)
-        setTopPerformers(topPerformers)
       } catch (error) {
         console.error('Error fetching team data:', error)
-        setTeamStats({
-          wins: 0,
-          losses: 0,
-          winPct: 0,
-          lastTenRecord: '0-0',
-          streak: '0',
-          pointsPerGame: 0,
-          pointsAllowed: 0
-        })
-        setRecentGames([])
-        setTopPerformers([])
+        if (isSubscribed) {
+          setTeamStats({
+            wins: 0,
+            losses: 0,
+            winPct: 0,
+            lastTenRecord: '0-0',
+            streak: '0',
+            pointsPerGame: 0,
+            pointsAllowed: 0
+          })
+          setRecentGames([])
+          setTopPerformers([])
+        }
       } finally {
-        setLoading(false)
+        if (isSubscribed) {
+          setLoading(false)
+        }
       }
     }
 
     fetchTeamData()
+
+    return () => {
+      isSubscribed = false
+    }
   }, [params.teamId, router, team])
 
   if (!team) return null
@@ -246,20 +323,21 @@ export default function TeamPage() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6 p-4 relative"
     >
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-black opacity-75 blur-xl"></div>
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#232323_1px,transparent_1px),linear-gradient(to_bottom,#232323_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_110%)] -z-10"></div>
+      {/* Background effects - optimized for performance */}
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-black/20 -z-20" />
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#232323_1px,transparent_1px),linear-gradient(to_bottom,#232323_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-10 -z-10" />
 
       {/* Team Header */}
-      <div className="relative flex items-center space-x-6 bg-gradient-to-r from-gray-900/90 to-black/90 p-6 rounded-xl backdrop-blur-xl border border-white/10">
+      <div className="relative flex items-center space-x-6 bg-white/5 p-6 rounded-xl shadow-lg">
+        <div className="backdrop-blur-sm absolute inset-0 rounded-xl -z-10" />
         <img 
-          src={`https://cdn.nba.com/teams/legacy/logos/1610${team.id}/global/L/logo.svg`} 
+          src={team.logo}
           alt={team.name}
           className="w-32 h-32 object-contain"
         />
         <div>
           <h1 className="text-4xl font-bold text-white mb-2">{team.name}</h1>
-          <div className="flex space-x-4 text-gray-400">
+          <div className="flex space-x-4 text-gray-300">
             {teamStats && (
               <>
                 <span>{teamStats.wins}-{teamStats.losses}</span>
@@ -276,18 +354,19 @@ export default function TeamPage() {
       {/* Team Stats */}
       {teamStats && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-r from-gray-900/90 to-black/90 p-6 rounded-xl backdrop-blur-xl border border-white/10">
+          <div className="relative bg-white/5 p-6 rounded-xl shadow-lg">
+            <div className="backdrop-blur-sm absolute inset-0 rounded-xl -z-10" />
             <h2 className="text-xl font-bold text-white mb-4 flex items-center">
               <BarChart2 className="w-5 h-5 mr-2 text-cyan-400" />
               Team Statistics
             </h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-gray-400">Points Per Game</p>
+                <p className="text-gray-300">Points Per Game</p>
                 <p className="text-2xl font-bold text-white">{teamStats.pointsPerGame.toFixed(1)}</p>
               </div>
               <div>
-                <p className="text-gray-400">Points Allowed</p>
+                <p className="text-gray-300">Points Allowed</p>
                 <p className="text-2xl font-bold text-white">{teamStats.pointsAllowed.toFixed(1)}</p>
               </div>
             </div>
@@ -296,7 +375,8 @@ export default function TeamPage() {
       )}
 
       {/* Recent Games */}
-      <div className="bg-gradient-to-r from-gray-900/90 to-black/90 p-6 rounded-xl backdrop-blur-xl border border-white/10">
+      <div className="relative bg-white/5 p-6 rounded-xl shadow-lg">
+        <div className="backdrop-blur-sm absolute inset-0 rounded-xl -z-10" />
         <h2 className="text-xl font-bold text-white mb-4 flex items-center">
           <Calendar className="w-5 h-5 mr-2 text-cyan-400" />
           Recent Games
@@ -305,7 +385,7 @@ export default function TeamPage() {
           {recentGames.map(game => (
             <div 
               key={game.id}
-              className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg"
+              className="flex items-center justify-between p-4 bg-black/20 rounded-lg"
             >
               <div className="flex items-center space-x-3">
                 <img 
@@ -313,7 +393,7 @@ export default function TeamPage() {
                   alt={game.visitor_team.name}
                   className="w-8 h-8 object-contain"
                 />
-                <span className="text-white">{game.visitor_team.name}</span>
+                <span className="text-gray-200">{game.visitor_team.name}</span>
                 {game.type !== 'upcoming' && (
                   <span className="text-xl font-bold text-white">{game.visitor_team.score}</span>
                 )}
@@ -338,7 +418,7 @@ export default function TeamPage() {
                 {game.type !== 'upcoming' && (
                   <span className="text-xl font-bold text-white">{game.home_team.score}</span>
                 )}
-                <span className="text-white">{game.home_team.name}</span>
+                <span className="text-gray-200">{game.home_team.name}</span>
                 <img 
                   src={game.home_team.logo} 
                   alt={game.home_team.name}
@@ -351,7 +431,8 @@ export default function TeamPage() {
       </div>
 
       {/* Top Performers */}
-      <div className="bg-gradient-to-r from-gray-900/90 to-black/90 p-6 rounded-xl backdrop-blur-xl border border-white/10">
+      <div className="relative bg-white/5 p-6 rounded-xl shadow-lg">
+        <div className="backdrop-blur-sm absolute inset-0 rounded-xl -z-10" />
         <h2 className="text-xl font-bold text-white mb-4 flex items-center">
           <Users className="w-5 h-5 mr-2 text-cyan-400" />
           Top Performers
@@ -360,10 +441,10 @@ export default function TeamPage() {
           {topPerformers.map(performance => (
             <div 
               key={performance.gameId}
-              className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg"
+              className="flex items-center justify-between p-4 bg-black/20 rounded-lg"
             >
               <div className="flex items-center space-x-3">
-                <span className="text-white">{format(parseISO(performance.date), 'MMM d')}</span>
+                <span className="text-gray-200">{format(parseISO(performance.date), 'MMM d')}</span>
               </div>
               <div className="text-center">
                 <div className="text-sm text-gray-400">Top Performers</div>
@@ -374,7 +455,7 @@ export default function TeamPage() {
                     key={player.name}
                     className="flex items-center space-x-2"
                   >
-                    <span className="text-white">{player.name}</span>
+                    <span className="text-gray-200">{player.name}</span>
                     <span className="text-xl font-bold text-white">{player.points}pts</span>
                   </div>
                 ))}
@@ -387,17 +468,24 @@ export default function TeamPage() {
   )
 }
 
-function calculateStreak(games: any[]) {
-  let currentStreak = 0
-  let streakType = games[0]?.won ? 'W' : 'L'
-  for (let i = 0; i < games.length; i++) {
-    if ((streakType === 'W' && games[i].won) ||
-        (streakType === 'L' && !games[i].won)) {
-      currentStreak++
+const calculateStreak = (games: ProcessedGame[]): string => {
+  if (!games.length) return '0';
+  
+  let streak = 0;
+  let streakType = '';
+  
+  for (const game of games) {
+    const isWin = game.won;
+
+    if (streak === 0) {
+      streakType = isWin ? 'W' : 'L';
+      streak = 1;
+    } else if ((isWin && streakType === 'W') || (!isWin && streakType === 'L')) {
+      streak++;
     } else {
-      break
+      break;
     }
   }
 
-  return `${currentStreak}${streakType}`
+  return `${streak}${streakType}`;
 }

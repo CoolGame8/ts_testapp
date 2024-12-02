@@ -373,3 +373,7 @@ export const NBA_TEAMS: Record<string, NBATeam> = {
     division: 'Southeast'
   }
 }
+
+export function getTeamData(teamTricode: string): NBATeam | undefined {
+  return NBA_TEAMS[teamTricode.toUpperCase()]
+}
